@@ -1,80 +1,64 @@
-//
-// Created by Krzysztof Gonciarz on 5/7/18.
-//
-
 #include <pybind11/pybind11.h>
-#include <python2.7/Python.h>
-#include "ConfigAPR.h"
-#include "data_structures/APR/APR.hpp"
-#include "numerics/APRTreeNumerics.hpp"
+#include <iostream>
 
 namespace py = pybind11;
 
 // -------- Check if properly configured in CMAKE -----------------------------
-#ifndef APR_PYTHON_MODULE_NAME
-#error "Name of APR module (python binding) is not defined!"
+#ifndef TEMPLATE_PYTHON_MODULE_NAME
+#error "Name of module (python binding) is not defined!"
 #endif
 
-// TODO: If more classes added wrappers should be moved to seperate files, only
-//       module definition shold be kept here
-// -------- Utility classes to be wrapped in python ----------------------------
+// -------- Class to be wrapped in python ----------------------------
 template <typename T>
-class AprToImg {
-    PixelData <T> reconstructedImage;
+class MyClass {
+    std::unique_ptr<T[]> iData;
 
 public:
-    AprToImg () {}
-    void read(const std::string &aAprFileName) {
-        APR <T> apr;
-        apr.read_apr(aAprFileName);
+    MyClass () {
+        iData.reset( new T[size()] );
+        for (int i = 0; i < size(); ++i) iData[i] = 2 * (i + 1);
+    }
 
-        APRTree<T> aprTree;
-        aprTree.init(apr);
-        
-        ExtraParticleData<T> partsTree;
-        APRTreeNumerics::fill_tree_from_particles(apr,aprTree,apr.particles_intensities,partsTree,[] (const T& a,const T& b) {return std::max(a,b);});
-
-        ReconPatch r;
-        APRReconstruction().interp_image_patch(apr, aprTree, reconstructedImage, apr.particles_intensities, partsTree, r);
-   }
-
-    T *data() {return reconstructedImage.mesh.get();}
-    int height() const {return reconstructedImage.x_num;}
-    int width() const {return reconstructedImage.y_num;}
-    int depth() const {return reconstructedImage.z_num;}
+    T *data() {return iData.get();}
+    int size() const {return 10;}
+    void showData() const {
+        std::cout << "CPP: [";
+        for (int i = 0; i < size() - 1; ++i) {
+            std::cout << iData[i] << ", ";
+        }
+        std::cout << iData[size() - 1];
+        std::cout << "]" << std::endl;
+    }
 };
 
 // -------- Templated wrapper -------------------------------------------------
 template <typename DataType>
-void AddAprToImg(pybind11::module &m, const std::string &aTypeString) {
-    using AprType = AprToImg<DataType>;
-    std::string typeStr = "Apr" + aTypeString;
-    py::class_<AprType>(m, typeStr.c_str(), py::buffer_protocol())
+void AddMyClass(pybind11::module &m, const std::string &aTypeString) {
+    using MyType = MyClass<DataType>;
+    std::string typeStr = "MyClass" + aTypeString;
+    py::class_<MyType>(m, typeStr.c_str(), py::buffer_protocol())
             .def(py::init())
-            .def("read", &AprType::read, "Method to read HDF5 APR files")
-            .def("width", &AprType::width, "Returns number of columns (x)")
-            .def("height", &AprType::height, "Returns number of rows (y)")
-            .def("depth", &AprType::depth, "Returns depth (z)")
-            .def_buffer([](AprType &a) -> py::buffer_info{
+            .def("size", &MyType::size, "Returns size")
+            .def("showData", &MyType::showData, "Shows data in CPP side")
+            .def_buffer([](MyType &a) -> py::buffer_info{
                 return py::buffer_info(
                         a.data(),
                         sizeof(DataType),
                         py::format_descriptor<DataType>::format(),
-                        3,
-                        {a.depth(), a.height(), a.width()},
-                        {sizeof(DataType) * a.width() * a.height(), sizeof(DataType) * a.width(), sizeof(DataType)}
+                        1,
+                        {a.size()},
+                        {sizeof(DataType)}
                 );
             });
 }
 
 
 // -------- Definition of python module ---------------------------------------
-PYBIND11_MODULE(APR_PYTHON_MODULE_NAME, m) {
-    m.doc() = "python binding for LibAPR library";
-    m.attr("__version__") = pybind11::str(ConfigAPR::APR_VERSION);
+PYBIND11_MODULE(TEMPLATE_PYTHON_MODULE_NAME, m) {
+    m.doc() = "python binding for MyCLass library";
+    m.attr("__version__") = "1.0.0";
 
-    AddAprToImg<uint8_t>(m, "Byte");
-    AddAprToImg<uint16_t>(m, "Short");
-    AddAprToImg<float>(m, "Float");
+    AddMyClass<uint8_t>(m, "Byte");
+    AddMyClass<uint16_t>(m, "Short");
+    AddMyClass<float>(m, "Float");
 }
-
