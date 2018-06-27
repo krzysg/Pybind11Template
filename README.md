@@ -1,7 +1,7 @@
 # Pybind11Template
 Template cmake project for playing with pybind11
 
-# To build:
+## To build:
 ```
 mkdir build
 cd build
@@ -9,7 +9,7 @@ cmake ..
 make
 ```
 
-# To play with example you can run such a script in a build directory
+## To play with example you can run such a script in a build directory
 ``` python
 from __future__ import print_function
 import numpy as np
