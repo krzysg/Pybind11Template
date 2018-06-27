@@ -1,5 +1,6 @@
 #include <pybind11/pybind11.h>
 #include <iostream>
+#include <sstream>
 
 namespace py = pybind11;
 
@@ -12,22 +13,31 @@ namespace py = pybind11;
 template <typename T>
 class MyClass {
     std::unique_ptr<T[]> iData;
+    size_t iSize;
 
 public:
-    MyClass () {
-        iData.reset( new T[size()] );
-        for (int i = 0; i < size(); ++i) iData[i] = 2 * (i + 1);
-    }
 
-    T *data() {return iData.get();}
-    int size() const {return 10;}
-    void showData() const {
-        std::cout << "CPP: [";
-        for (int i = 0; i < size() - 1; ++i) {
-            std::cout << iData[i] << ", ";
+    MyClass (size_t size) : iSize(size) {
+        iData.reset( new T[size] );
+        for (size_t i = 0; i < size; ++i) iData[i] = 2 * (i + 1);
+    }
+    ~MyClass() { std::cout << "~MyClass[" << iSize << "]" << std::endl; }
+
+    size_t size() const { return iSize; }
+    T *data() { return iData.get(); }
+
+    T& operator[](size_t idx) { return iData[idx]; }
+    const T& operator[](size_t idx) const { return iData[idx]; }
+
+    std::string toString() {
+        std::ostringstream s;
+        s << "CPP: [";
+        for (size_t i = 0; i < size() - 1; ++i) {
+            s << iData[i] << ", ";
         }
-        std::cout << iData[size() - 1];
-        std::cout << "]" << std::endl;
+        s << iData[size() - 1];
+        s << "]";
+        return s.str();
     }
 };
 
@@ -37,10 +47,18 @@ void AddMyClass(pybind11::module &m, const std::string &aTypeString) {
     using MyType = MyClass<DataType>;
     std::string typeStr = "MyClass" + aTypeString;
     py::class_<MyType>(m, typeStr.c_str(), py::buffer_protocol())
-            .def(py::init())
-            .def("size", &MyType::size, "Returns size")
-            .def("showData", &MyType::showData, "Shows data in CPP side")
-            .def_buffer([](MyType &a) -> py::buffer_info{
+            .def(py::init<size_t>())
+            .def("__repr__", &MyType::toString, "Default repr function")
+            .def("__getitem__", [](const MyType &s, size_t i) {
+                if (i >= s.size()) throw py::index_error();
+                return s[i];
+            })
+            .def("__setitem__", [](MyType &s, size_t i, DataType v) {
+                if (i >= s.size()) throw py::index_error();
+                s[i] = v;
+            })
+            .def("__len__", &MyType::size)
+            .def_buffer([](MyType &a) -> py::buffer_info {
                 return py::buffer_info(
                         a.data(),
                         sizeof(DataType),
