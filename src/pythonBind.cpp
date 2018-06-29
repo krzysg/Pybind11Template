@@ -77,8 +77,7 @@ template <typename DataType>
 void AddMyClass(pybind11::module &m, const std::string &aTypeString) {
     using MyType = MyVectorClass<DataType>;
     std::string typeStr = "MyVectorClass" + aTypeString;
-    py::class_<MyType> classObj(m, typeStr.c_str(), py::buffer_protocol(), py::dynamic_attr());
-    classObj
+    py::class_<MyType>(m, typeStr.c_str(), py::buffer_protocol())
         .def(py::init([=](py::buffer b) {
             py::buffer_info info = b.request();
 
@@ -90,7 +89,7 @@ void AddMyClass(pybind11::module &m, const std::string &aTypeString) {
                 throw std::runtime_error(errMsg);
             }
             MyType *m = new MyType();
-            m->setFromPython((DataType*)info.ptr, info.size, b.release());
+            m->setFromPython(static_cast<DataType*>(info.ptr), info.size, b.release());
             return m;
         }))
         .def(py::init<size_t>())
@@ -113,19 +112,6 @@ void AddMyClass(pybind11::module &m, const std::string &aTypeString) {
                     {a.size()},
                     {sizeof(DataType)}
             );
-        })
-        .def("set", [=](MyType &m, py::buffer b) {
-            py::buffer_info info = b.request();
-
-            if (info.ndim != 1) throw std::runtime_error("Incompatible buffer dimension!");
-            if (info.format != py::format_descriptor<DataType>::format()) {
-                std::string errMsg = "Incompatible format: expected a <";
-                errMsg += aTypeString;
-                errMsg += "> type vector!";
-                throw std::runtime_error(errMsg);
-            }
-
-            m.setFromPython((DataType*)info.ptr, info.size, b.release());
         });
 }
 

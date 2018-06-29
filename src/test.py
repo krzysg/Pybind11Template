@@ -37,7 +37,7 @@ print(x)
 
 
 print("\n\n\n============== SHARING NUMPY WITH CPP =========")
-print("----------------- numpy OBJ created -------------")
+print("numpy OBJ created")
 n=np.arange(15, dtype=np.uint16)
 print("Size: ", len(n))
 
