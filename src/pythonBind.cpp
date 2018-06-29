@@ -14,21 +14,22 @@ namespace py = pybind11;
 template <typename T>
 class MyVectorClass {
     std::unique_ptr<T[]> iData;
-    size_t iSize;
+    size_t iSize = 0;
 
     bool releaseMemory = false;
     pybind11::handle handle;
 
 public:
 
-    MyVectorClass() { iSize = 0; }
+    MyVectorClass() : MyVectorClass(0) {}
 
-    MyVectorClass(size_t size) : iSize(size) {
-        iData.reset( new T[size] );
+    explicit MyVectorClass(size_t aSize) {
+        iSize = aSize;
+        iData.reset( new T[aSize] );
         releaseMemory = true;
 
         // init with a 1..size sequence
-        for (size_t i = 0; i < size; ++i) iData[i] = i + 1;
+        for (size_t i = 0; i < aSize; ++i) iData[i] = i + 1;
     }
 
     ~MyVectorClass() {
@@ -52,11 +53,11 @@ public:
         }
     }
 
-    void setFromPython(T *ptr, size_t size, const pybind11::handle &h) {
+    void setFromPython(T *aDataPtr, size_t aDataSize, const pybind11::handle &aPythonObjHandle) {
         releasePython();
-        handle.ptr() = h.ptr();
-        iData.reset(ptr);
-        iSize = size;
+        handle.ptr() = aPythonObjHandle.ptr();
+        iData.reset(aDataPtr);
+        iSize = aDataSize;
         releaseMemory = false;
     }
 
@@ -74,10 +75,10 @@ public:
 
 // -------- Templated wrapper -------------------------------------------------
 template <typename DataType>
-void AddMyClass(pybind11::module &m, const std::string &aTypeString) {
+void AddMyClass(pybind11::module &aPythonModule, const std::string &aTypeString) {
     using MyType = MyVectorClass<DataType>;
     std::string typeStr = "MyVectorClass" + aTypeString;
-    py::class_<MyType>(m, typeStr.c_str(), py::buffer_protocol())
+    py::class_<MyType>(aPythonModule, typeStr.c_str(), py::buffer_protocol())
         .def(py::init([=](py::buffer b) {
             py::buffer_info info = b.request();
 
@@ -88,28 +89,28 @@ void AddMyClass(pybind11::module &m, const std::string &aTypeString) {
                 errMsg += "> type vector!";
                 throw std::runtime_error(errMsg);
             }
-            MyType *m = new MyType();
-            m->setFromPython(static_cast<DataType*>(info.ptr), info.size, b.release());
-            return m;
+            auto *obj = new MyType();
+            obj->setFromPython(static_cast<DataType*>(info.ptr), static_cast<size_t>(info.size), b.release());
+            return obj;
         }))
         .def(py::init<size_t>())
         .def("__repr__", &MyType::toString)
-        .def("__getitem__", [](const MyType &s, size_t i) {
-            if (i >= s.size()) throw py::index_error();
-            return s[i];
+        .def("__getitem__", [](const MyType &obj, size_t idx) {
+            if (idx >= obj.size()) throw py::index_error();
+            return obj[idx];
         })
-        .def("__setitem__", [](MyType &s, size_t i, DataType v) {
-            if (i >= s.size()) throw py::index_error();
-            s[i] = v;
+        .def("__setitem__", [](MyType &obj, size_t idx, DataType value) {
+            if (idx >= obj.size()) throw py::index_error();
+            obj[idx] = value;
         })
         .def("__len__", &MyType::size)
-        .def_buffer([](MyType &a) -> py::buffer_info {
+        .def_buffer([](MyType &obj) -> py::buffer_info {
             return py::buffer_info(
-                    a.data(),
+                    obj.data(),
                     sizeof(DataType),
                     py::format_descriptor<DataType>::format(),
                     1,
-                    {a.size()},
+                    {obj.size()},
                     {sizeof(DataType)}
             );
         });
