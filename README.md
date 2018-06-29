@@ -16,10 +16,11 @@ import numpy as np
 from pyTemplate import *
 
 print("----------------- OBJ created -----------------")
-x=MyClassShort(8)
+x=MyVectorClassShort(8)
 print("Size: ", len(x))
+print(x)
 
-print("\n\n--------------- SHARED MEM --------------------")
+print("\n\n--------------- SHARED MEM C++ > NUMPY --------------------")
 # Sharing memory 
 img=np.array(x, copy = False)
 print(img)
@@ -28,12 +29,13 @@ img[0] = 123;
 print(img)
 print(x)
 
-print("\n\n------------------- COPY ----------------------")
-# Copying object
-img=np.array(x, copy = True)
-print(img)
-print(x)
-img[0] = 666;
-print(img)
-print(x)
+print("\n\n------------------- SHARED MEM NUMPY > C++ ----------------------")
+n=np.arange(15, dtype=np.uint16)
+y=MyVectorClassShort(n)
+print(n)
+print(y)
+y[0] = 666;
+print(n)
+print(y)
+
 ```
